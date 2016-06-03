@@ -1,9 +1,8 @@
-%% @author Arjan Scherpenisse <arjan@scherpenisse.net>
-%% @copyright 2011 Arjan Scherpenisse
-%% Date: 2011-02-26
-%% @doc Show all assigned variables in the template.
+%% @author Marc Worrell <marc@worrell.nl>
+%% @copyright 2016 Marc Worrell
+%% @doc Escape filter, same as 'force_escape'
 
-%% Copyright 2011 Arjan Scherpenisse
+%% Copyright 2016 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -17,16 +16,10 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
--module(scomp_base_debug).
--behaviour(gen_scomp).
+-module(filter_escape).
+-export([
+    escape/2
+    ]).
 
--export([vary/2, render/3]).
-
--include("zotonic.hrl").
-
-vary(_Params, _Context) -> nocache.
-
-render(_Params, #{} = Vars, Context) ->
-    Vars1 = [{K, io_lib:format("~p", [V])} || {K, V} <- maps:to_list(Vars)],
-    {ok, z_template:render("_debug.tpl", [{vars, Vars1}], Context)}.
-
+escape(V, Context) ->
+    filter_force_escape:force_escape(V, Context).
