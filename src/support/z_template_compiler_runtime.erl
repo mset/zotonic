@@ -27,7 +27,7 @@
     map_template_all/3,
     find_template/3,
     context_name/1,
-    compile_map_nested_value/2,
+    compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
     get_translations/2,
@@ -171,11 +171,17 @@ context_name(Context) ->
 
 
 %% @doc Compile time mapping of nested value lookup
--spec compile_map_nested_value(Tokens :: list(), Context :: term()) -> NewTokens :: list().
-compile_map_nested_value([{identifier, _, <<"m">>}, {identifier, _, Model}|Rest], _Context) ->
+-spec compile_map_nested_value(Tokens :: list(), ContextVar :: string(), Context :: term()) -> NewTokens :: list().
+compile_map_nested_value([{identifier, _, <<"m">>}, {identifier, _, Model}|Rest], _ContextVar, _Context) ->
     Module = binary_to_atom(<<"m_", Model/binary>>, 'utf8'),
     [{ast, erl_syntax:abstract(#m{model=Module})} | Rest];
-compile_map_nested_value(Ts, _Context) ->
+compile_map_nested_value([{identifier, _, <<"q">>}, {identifier, _, QArg}|Rest], ContextVar, _Context) ->
+    Ast = erl_syntax:application(
+                erl_syntax:atom(z_context),
+                erl_syntax:atom(get_q),
+                [ erl_syntax:abstract(QArg), erl_syntax:variable(ContextVar) ]),
+    [{ast, Ast} | Rest];
+compile_map_nested_value(Ts, _ContextVar, _Context) ->
     Ts.
 
 

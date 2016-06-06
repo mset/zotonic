@@ -25,12 +25,12 @@
 'after'(_, undefined, _Context) ->
     undefined;
 'after'(L, V, Context) ->
-    next_of1(erlydtl_runtime:to_list(L, Context), V).
+    next_of1(z_template_compiler_runtime:to_list(L, Context), V).
 
-    next_of1([], _V) ->
-        undefined;
-    next_of1([V,N|_T], V) ->
-        N;
-    next_of1([_|T], V) ->
-        next_of1(T, V).
+next_of1([], _V) ->
+    undefined;
+next_of1([V,N|_T], V) ->
+    N;
+next_of1([_|T], V) ->
+    next_of1(T, V).
 

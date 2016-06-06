@@ -179,7 +179,7 @@ ensure_category(Props, Context) ->
     end.
 
 cat(Props, Context) ->
-    case erlydtl_runtime:find_value(category, Props, Context) of
-        undefined -> erlydtl_runtime:find_value(category_id, Props);
+    case z_template_compiler_runtime:find_value(category, Props, #{}, Context) of
+        undefined -> z_template_compiler_runtime:find_value(category_id, Props, #{}, Context);
         Cat -> Cat
     end.

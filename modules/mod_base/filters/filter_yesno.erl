@@ -20,18 +20,19 @@
 -export([yesno/2, yesno/3]).
 
 
-yesno(B, _Context) ->
-    case erlydtl_runtime:is_false(B) of
-        true -> "no";
-        false -> "yes"
+yesno(B, Context) ->
+    case z_template_compiler_runtime:to_bool(B, Context) of
+        true -> ?__("yes", Context);
+        false -> ?__("no", Context)
     end.
+
 yesno(undefined, Values, _Context) ->
     case string:tokens(z_convert:to_list(Values), ",") of
         [_Yes, _No, Maybe] -> Maybe;
         [_Yes, No] -> No
     end;
 yesno(B, Values, _Context) ->
-    case erlydtl_runtime:is_false(B) of
+    case z_template_compiler_runtime:to_bool(B, Context) of
         true ->
             [_Yes,No|_Rest] = string:tokens(z_convert:to_list(Values), ","),
             No;
