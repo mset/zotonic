@@ -22,6 +22,12 @@
 
 %% interface functions
 -export([
+    format/2,
+    format/3,
+
+    format_utc/2,
+    format_utc/3,
+
     to_local/2,
     to_utc/2,
 
@@ -71,6 +77,29 @@
 
 -include_lib("zotonic.hrl").
 
+
+%% @doc Format the current date according to the format and the timezone settings in the context.
+format(Format, Context) ->
+    format(calendar:universal_time(), Format, Context).
+
+%% @doc Format a date according to the format and the timezone settings in the context.
+format(Date, Format, #context{} = Context) ->
+    z_dateformat:format(z_datetime:to_local(Date, Context), Format, format_opts(Date, z_context:tz(Context), Context)).
+
+%% @doc Format the current date in UTC.
+format_utc(Format, Context) ->
+    format_utc(calendar:universal_time(), Format, Context).
+
+%% @doc Format the date using the UTC timezone.
+format_utc(Date, Format, #context{} = Context) ->
+    z_dateformat:format(Date, Format, format_opts(Date, "GMT", Context)).
+
+format_opts(Date, Tz, Context) ->
+    [
+        {utc, Date},
+        {tz, z_convert:to_list(Tz)},
+        {tr, {l10n_date, [Context]}}
+    ].
 
 %% @doc Convert a time to the local context time using the current timezone.
 -spec to_local(calendar:datetime()|undefined|time_not_exists, string()|binary()|#context{}) -> calendar:datetime() | undefined.
@@ -210,11 +239,6 @@ relative_time_n(N, _F, DT) when N =< 0 ->
     DT;
 relative_time_n(N, F, DT) ->
     relative_time_n(N-1, F, F(DT)).
-
-
-%% @doc Format a date/time. Convenience function which calls the zotonic erlydtl stub.
-format(Date, FormatString, Context) ->
-    erlydtl_dateformat:format(Date, FormatString, Context).
 
 
 %% @doc Show a humanized version of a relative datetime.  Like "4 months, 3 days ago".

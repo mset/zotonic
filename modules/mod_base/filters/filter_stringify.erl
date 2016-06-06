@@ -36,7 +36,7 @@ stringify(X, Context) ->
 stringify_1(undefined, _Context) ->
     <<>>;
 stringify_1({{_Y,_M,_D},{_H,_I,_S}} = Date, Context) ->
-	erlydtl_dateformat:format(Date, "Y-m-d H:i:s", Context);
+	z_datetime:format(Date, "Y-m-d H:i:s", Context);
 stringify_1(#m{} = M, Context) ->
     z_template_compiler_runtime:to_simple_value(M, Context);
 stringify_1(B, _Context) when is_binary(B) ->

@@ -31,7 +31,7 @@ compile: $(REBAR)
 	bin/zotonic compile
 
 test: compile
-	bin/zotonic runtests && bin/zotonic runtests
+	bin/zotonic runtests
 
 # Generate documentation
 .PHONY: docs edocs
