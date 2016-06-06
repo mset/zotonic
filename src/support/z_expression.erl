@@ -14,28 +14,30 @@
 -include("zotonic.hrl").
 
 
-%% @doc Parse an expression to an expression tree.  Uses the erlydtl parser.
+%% @doc Parse an expression to an expression tree.  Uses the template_compiler parser.
 parse(Expr) when is_binary(Expr) ->
-    case erlydtl_scanner:scan(<<"{{", Expr/binary, "}}">>) of
+    case template_compiler_scanner:scan(<<"{{", Expr/binary, "}}">>) of
         {ok, Tokens} ->
-            case erlydtl_parser:parse(Tokens) of
-                {ok, [Tree|_]} -> {ok, simplify(Tree)};
+            case template_compiler_parser:parse(Tokens) of
+                {ok, {base, [Tree|_]}} -> {ok, simplify(Tree)};
                 Err -> Err
             end;
-        Err ->
-            Err
+        {error, _} = Error ->
+            Error
     end;
 parse(Expr) ->
     parse(z_convert:to_binary(Expr)).
 
 
+simplify({find_value, [Value]}) ->
+    simplify(Value);
 simplify({expr, Op, Left, Right}) ->
     {expr, z_convert:to_atom(Op), simplify(Left), simplify(Right)};
 simplify({expr, Op, Expr}) ->
     {expr, z_convert:to_atom(Op), simplify(Expr)};
-simplify({variable, {identifier,_,"m"}}) ->
+simplify({identifier, _, <<"m">>}) ->
     m;
-simplify({variable, {identifier,_,Name}}) ->
+simplify({identifier,_,Name}) ->
     {variable, Name};
 simplify({number_literal, _, Val}) ->
     z_convert:to_integer(Val);
@@ -63,15 +65,15 @@ eval(Tree, Vars, Context) ->
     eval1(Tree, Vars, Context).
 
 eval1({expr, Op, Left, Right}, Vars, Context) ->
-    erlydtl_operators:Op(eval1(Left, Vars, Context), eval1(Right, Vars, Context), Context);
+    template_compiler_operators:Op(eval1(Left, Vars, Context), eval1(Right, Vars, Context), Context);
 eval1({expr, Op, Expr}, Vars, Context) ->
-    erlydtl_operators:Op(eval1(Expr, Vars, Context), Context);
+    template_compiler_operators:Op(eval1(Expr, Vars, Context), Context);
 eval1({variable, Name}, Vars, Context) ->
-    erlydtl_runtime:find_value(Name, Vars, Context);
+    z_template_compiler_runtime:find_value(Name, Vars, #{}, Context);
 eval1({index_value, Array, Index}, Vars, Context) ->
-    erlydtl_runtime:find_value(eval1(Index, Vars, Context), eval1(Array, Vars, Context), Context);
+    template_compiler_operators:find_value(eval1(Index, Vars, Context), eval1(Array, Vars, Context), Context);
 eval1({attribute, Attr, From}, Vars, Context) ->
-    erlydtl_runtime:find_value(Attr, eval1(From, Vars, Context), Vars, Context);
+    template_compiler_operators:find_value(Attr, eval1(From, Vars, Context), Vars, Context);
 eval1({value_list, List}, Vars, Context) ->
     [ eval1(Elt, Vars, Context) || Elt <- List ];
 eval1({apply_filter, filter_default, _Func, Expr, Args}, Vars, Context) ->
