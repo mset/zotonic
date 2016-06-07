@@ -41,7 +41,10 @@
     to_simple_values/2,
     to_simple_value/2,
     to_render_result/3,
-    escape/2
+    escape/2,
+    trace_compile/4,
+    trace_render/3,
+    trace_block/4
     ]).
 
 -include("zotonic.hrl").
@@ -475,3 +478,70 @@ set_context_vars(TplVars, Context) ->
     %% Todo: check for 'with sudo'
     Context1.
 
+%% @doc Called when compiling a module
+-spec trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.
+trace_compile(Module, Filename, Options, Context) ->
+    SrcPos = proplists:get_value(trace_position, Options),
+    z_notifier:notify(
+        #debug{
+            what=template, 
+            arg={compile, Filename, SrcPos, Module}
+        }, Context),
+    case SrcPos of
+        {File, Line, _Col} ->
+            lager:debug("[~p] Compiling \"~s\" (called from \"~s:~p\")",
+                        [z_context:site(Context), Filename, File, Line]);
+        undefined ->
+            lager:debug("[~p] Compiling \"~s\"",
+                        [z_context:site(Context), Filename])
+    end.
+
+%% @doc Called when a template is rendered (could be from an include)
+-spec trace_render(binary(), template_compiler:options(), term()) -> ok.
+trace_render(Filename, Options, Context) ->
+    SrcPos = proplists:get_value(trace_position, Options),
+    case z_convert:to_bool(m_config:get_value(mod_development, debug_includes, Context)) of
+        true ->
+            case SrcPos of
+                {File, Line, _Col} ->
+                    lager:info("[~p] Include \"~s\" by \"~s:~p\"",
+                               [z_context:site(Context), Filename, File, Line]),
+                    {ok,
+                        [ <<"\n<!-- START ">>, relpath(Filename), 
+                          <<" by ">>, relpath(File), $:, integer_to_binary(Line),
+                          <<" -->\n">> ],
+                        [ <<"\n<!-- END ">>, relpath(Filename),  <<" -->\n">> ]
+                    };
+                undefined ->
+                    lager:info("[~p] Render \"~s\"",
+                               [z_context:site(Context), Filename]),
+                    {ok,
+                        [ <<"\n<!-- START ">>, relpath(Filename), <<" -->\n">> ],
+                        [ <<"\n<!-- END ">>, relpath(Filename),  <<" -->\n">> ]
+                    }
+            end;
+        false ->
+            ok
+    end.
+
+%% @doc Called when a block function is called
+-spec trace_block({binary(), integer(), integer()}, atom(), atom(), term()) -> ok | {ok, iolist(), iolist()}.
+trace_block({File, Line, _Col}, Name, Module, Context) ->
+    case z_convert:to_bool(m_config:get_value(mod_development, debug_blocks, Context)) of
+        true ->
+            lager:info("[~p] Call block \"~p\" in \"~s\" by \"~s:~p\"",
+                       [z_context:site(Context), Name, Module:filename(), File, Line]),
+            {ok,
+                [ <<"\n<!-- BLOCK ">>, atom_to_binary(Name, 'utf8'), " @ ", relpath(Module:filename()), 
+                  <<" by ">>, relpath(File), $:, integer_to_binary(Line),
+                  <<" -->\n">> ],
+                [ <<"\n<!-- ENDBLOCK ">>, atom_to_binary(Name, 'utf8'),  <<" -->\n">> ]
+            };
+        false ->
+            ok
+    end.
+
+
+relpath(Filename) ->
+    BaseLen = size(z_convert:to_binary(os:getenv("ZOTONIC"))),
+    binary:part(Filename, BaseLen, size(Filename) - BaseLen).

@@ -135,36 +135,3 @@ render_to_iolist(File, Vars, Context) ->
 is_template_module(Module) ->
     template_compiler:is_template_module(Module).
 
-
-
-%% TODO add the following via template_compiler callbacks
-
-% Result = case z_filewatcher_mtime:is_template_modified(Module, z_context:site(Context)) of
-%             true -> compile(File, FoundFile, Module, Context);
-%             false -> {ok, Module}
-%          end,
-
-% z_notifier:notify(#debug{what=template, arg={compile, File, FoundFile, Module}}, Context),
-
-
-% get_debug_includes(Context) ->
-%     z_convert:to_bool(m_config:get_value(mod_development, debug_includes, Context)).
-    
-% get_debug_blocks(Context) ->
-%     z_convert:to_bool(m_config:get_value(mod_development, debug_blocks, Context)).
-    
-% runtime_wrap_debug_comments(FilePath, Output, Context) when is_binary(FilePath) ->
-%     case get_debug_includes(Context) of
-%         false ->
-%             Output;
-%         true ->
-%             [
-%                 <<"\n<!-- START ">>, relpath(FilePath), <<" (runtime) -->\n">>, 
-%                 Output, 
-%                 <<"\n<!-- END ">>, relpath(FilePath),  <<" -->\n">>
-%             ]
-%     end.
-
-% relpath(FilePath) ->
-%     BaseLen = size(z_convert:to_binary(os:getenv("ZOTONIC"))),
-%     binary:part(FilePath, BaseLen, size(FilePath) - BaseLen).
