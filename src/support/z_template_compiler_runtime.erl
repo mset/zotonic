@@ -25,8 +25,6 @@
 -export([
     map_template/3,
     map_template_all/3,
-    find_template/3,
-    context_name/1,
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
@@ -46,36 +44,47 @@
     ]).
 
 -include("zotonic.hrl").
+-include_lib("template_compiler/include/template_compiler.hrl").
 
 
 %% @doc Dynamic mapping of a template to a template name, context sensitive on the template vars.
--spec map_template(template_compiler:template(), #{}, term()) -> template_compiler:template1().
+-spec map_template(template_compiler:template(), #{}, term()) ->
+            {ok, template_compiler:template_file()} | {error, enoent|term()}.
+map_template(#template_file{} = Tpl, _Vars, _Context) ->
+    {ok, Tpl};
 map_template({cat, Template}, Vars, Context) ->
     case maps:get(id, Vars, undefined) of
-        undefined -> Template;
+        undefined -> map_template_1(Template, Context);
         Id -> map_template({cat, Template, Id}, Vars, Context)
     end;
 map_template({cat, Template, [Cat|_] = IsA}, _Vars, Context) when is_atom(Cat) ->
     map_template_cat(Template, IsA, Context);
 map_template({cat, Template, Id}, _Vars, Context) ->
     case m_rsc:rid(Id, Context) of
-        undefined -> Template;
+        undefined -> map_template_1(Template, Context);
         RscId -> map_template_cat(Template, RscId, Context)
     end;
 map_template({overrules, Template, Filename}, _Vars, Context) ->
     Templates = z_module_indexer:find_all(template, Template, Context),
     find_next_template(Filename, Templates);
-map_template(Template, _Vars, _Context) ->
-    Template.
+map_template(Template, _Vars, Context) ->
+    map_template_1(Template, Context).
 
 
-find_next_template(_Filename, []) -> undefined;
-find_next_template(Filename, [#module_index{filepath=Filename},Next|_]) -> {filename, Next#module_index.filepath};
-find_next_template(Filename, [_|Rest]) -> find_next_template(Filename, Rest).
+find_next_template(_Filename, []) -> 
+    {error, enoent};
+find_next_template(Filename, [#module_index{filepath=Filename},Next|_]) ->
+    Key = Next#module_index.key,
+    {ok, #template_file{
+        filename=Next#module_index.filepath, 
+        template=Key#module_index_key.name
+    }};
+find_next_template(Filename, [_|Rest]) ->
+    find_next_template(Filename, Rest).
 
 
-map_template_cat(Template, None, _Context) when None =:= <<>>; None =:= undefined; None =:= [] ->
-    Template;
+map_template_cat(Template, None, Context) when None =:= <<>>; None =:= undefined; None =:= [] ->
+    map_template_1(Template, Context);
 map_template_cat(Template, [Item|_]=IsA, Context) when is_atom(Item) ->
     map_template_cat_1(Template, IsA, Context);
 map_template_cat(Template, Id, Context) ->
@@ -88,20 +97,18 @@ map_template_cat(Template, Id, Context) ->
 map_template_cat_1(Template, Stack, Context) when is_binary(Template) ->
     Root = filename:rootname(Template),
     Ext = filename:extension(Template),
-    ContextName = context_name(Context),
     case lists:foldr(fun(Cat, {error, enoent}) ->
-                            find_template(
-                                    <<Root/binary, $., (z_convert:to_binary(Cat))/binary, Ext/binary>>,
-                                    ContextName,
-                                    Context);
-                        (_Cat, Found) ->
-                            Found  
-                     end, 
-                     {error, enoent},
-                     Stack)
+                        map_template_1(
+                                <<Root/binary, $., (z_convert:to_binary(Cat))/binary, Ext/binary>>,
+                                Context);
+                    (_Cat, Found) ->
+                        Found  
+                 end,
+                 {error, enoent},
+                 Stack)
     of
-        {error, enoent} -> Template;
-        {ok, Filename} -> {filename, Filename}
+        {error, enoent} -> map_template_1(Template, Context);
+        {ok, _} = OK -> OK
     end.
 
 
@@ -124,7 +131,10 @@ map_template_all(Template, _Vars, Context) when is_binary(Template) ->
 
 map_template_all_1(Template, Context) ->
     Tpls = z_module_indexer:find_all(template, Template, Context),
-    [ {filename, Tpl#module_index.filepath} || Tpl <- Tpls ].
+    [ #template_file{
+                filename=Filename, 
+                template=Key#module_index_key.name
+      } || #module_index{filepath=Filename, key=Key} <- Tpls ].
 
 map_template_all_cat(Template, None, Context) when None =:= <<>>; None =:= undefined; None =:= [] ->
     map_template_all_1(Template, Context);
@@ -146,29 +156,26 @@ map_template_all_cat_1(Template, Stack, Context) when is_binary(Template) ->
                             end,
                             [],
                             Stack),
-    Templates1 = Templates ++ z_module_indexer:find_all(template, Template, Context),
-    [ {filename, Tpl#module_index.filepath} || Tpl <- Templates1 ].
+    Tpls = Templates ++ z_module_indexer:find_all(template, Template, Context),
+    [ #template_file{
+                filename=Filename, 
+                template=Key#module_index_key.name
+      } || #module_index{filepath=Filename, key=Key} <- Tpls ].
 
 
 %% @doc Map a template name to a template file.
--spec find_template(template_compiler:template1(), ContextName::term(), Context::term()) ->
+-spec map_template_1(binary(), #context{}) ->
             {ok, filename:filename()} | {error, enoent|term()}.
-find_template({filename, Filename}, _ContextName, _Context) ->
-    {ok, Filename};
-find_template(Template, _ContextName, Context) ->
+map_template_1(Template, Context) when is_binary(Template) ->
     case z_module_indexer:find(template, Template, Context) of
-        {ok, #module_index{filepath=Filename}} ->
-            {ok, Filename};
+        {ok, #module_index{filepath=Filename, key=Key}} ->
+            {ok, #template_file{
+                filename=Filename, 
+                template=Key#module_index_key.name
+            }};
         {error, _} = Error ->
             Error
     end.
-
-%% @doc Fetch the name to tag template lookups. This should make the name of the template unique with
-%%      respect to the mapping of a template to a filename.  Example: {site, ua_class}
--spec context_name(Context::term()) -> term().
-context_name(Context) ->
-    {z_context:site(Context), z_user_agent:get_class(Context)}.
-
 
 %% @doc Compile time mapping of nested value lookup
 -spec compile_map_nested_value(Tokens :: list(), ContextVar :: string(), Context :: term()) -> NewTokens :: list().

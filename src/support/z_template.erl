@@ -23,6 +23,7 @@
 
 -export([start_link/1]).
 
+-include_lib("template_compiler/include/template_compiler.hrl").
 -include_lib("zotonic.hrl").
 
 %% External exports
@@ -66,8 +67,12 @@ render(#render{template=Template, vars=Vars}, Context) ->
 -spec render(template_compiler:template()|#module_index{}, list()|#{}, #context{}) -> template_compiler:render_result().
 render(Template, Vars, Context) when is_list(Vars) ->
     render(Template, props_to_map(Vars, #{}), Context);
-render(#module_index{filepath=Filename}, Vars, Context) ->
-    render({filename, Filename}, Vars, Context);
+render(#module_index{filepath=Filename, key=Key}, Vars, Context) ->
+    Template = #template_file{
+        filename=Filename, 
+        template=Key#module_index_key.name
+    },
+    render(Template, Vars, Context);
 render(Template, Vars, Context) when is_map(Vars) ->
     OldCaching = z_depcache:in_process(true),
     Vars1 = ensure_zotonic_vars(Vars, Context),
