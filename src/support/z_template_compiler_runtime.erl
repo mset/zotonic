@@ -25,6 +25,7 @@
 -export([
     map_template/3,
     map_template_all/3,
+    is_modified/3,
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
@@ -176,6 +177,18 @@ map_template_1(Template, Context) when is_binary(Template) ->
         {error, _} = Error ->
             Error
     end.
+
+
+%% @doc Check if a file has been modified
+%% @todo Profile this and consider the memo cache to speed this up
+-spec is_modified(filename:filename(), calendar:datetime(), term()) -> boolean().
+is_modified(Filename, Mtime, _Context) ->
+    case z_filewatcher_mtime:mtime(Filename) of
+        {ok, Mtime} -> false;
+        {ok, _} -> true;
+        {error, _} -> true
+    end.
+
 
 %% @doc Compile time mapping of nested value lookup
 -spec compile_map_nested_value(Tokens :: list(), ContextVar :: string(), Context :: term()) -> NewTokens :: list().
