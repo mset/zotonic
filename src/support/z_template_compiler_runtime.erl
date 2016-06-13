@@ -29,6 +29,7 @@
     compile_map_nested_value/3,
     find_nested_value/3,
     find_value/4,
+    set_context_vars/2,
     get_translations/2,
     lookup_translation/3,
     custom_tag/4,
@@ -204,6 +205,12 @@ compile_map_nested_value([{identifier, _, <<"q">>}, {identifier, _, QArg}|Rest],
                 erl_syntax:atom(get_q),
                 [ erl_syntax:abstract(QArg), erl_syntax:variable(ContextVar) ]),
     [{ast, Ast} | Rest];
+compile_map_nested_value([{identifier, _, <<"z_language">>}], ContextVar, _Context) ->
+    Ast = erl_syntax:application(
+                erl_syntax:atom(z_context),
+                erl_syntax:atom(language),
+                [ erl_syntax:variable(ContextVar) ]),
+    [{ast, Ast}];
 compile_map_nested_value(Ts, _ContextVar, _Context) ->
     Ts.
 
@@ -294,6 +301,30 @@ find_value(Key, Ps, TplVars, Context) ->
     template_compiler_runtime:find_value(Key, Ps, TplVars, Context).
 
 
+-spec set_context_vars(#{}|[], term()) -> term().
+set_context_vars(Args, Context) when is_map(Args); is_list(Args) ->
+    Lang = z_context:language(Context),
+    Context1 = case get(z_language, Args, Lang) of
+            undefined -> Context;
+            Lang -> Context;
+            NewLang -> z_context:set_language(NewLang, Context)
+    end,
+    Context2 = case z_convert:to_bool(get(sudo, Args, false)) of
+            false -> Context1;
+            true -> z_acl:sudo(Context1)
+    end,
+    Context3 = case z_convert:to_bool(get(anondo, Args, false)) of
+            false -> Context2;
+            true -> z_acl:anondo(Context2)
+    end,
+    Context3.
+
+get(Prop, Args, Default) when is_map(Args) ->
+    maps:get(Prop, Args, Default);
+get(Prop, Args, Default) when is_list(Args) ->
+    proplists:get_value(Prop, Args, Default).
+
+
 %% @doc Fetch the translations for the given text.
 -spec get_translations(binary(), term()) -> binary() | {trans, [{atom(), binary()}]}.
 get_translations(Text, Context) ->
@@ -304,8 +335,8 @@ get_translations(Text, Context) ->
 
 %% @doc Find the best fitting translation.
 -spec lookup_translation({trans, list({atom(), binary()})}, TplVars :: #{}, Context :: term()) -> binary().
-lookup_translation({trans, _} = Trans, #{} = TplVars, Context) ->
-    z_trans:lookup_fallback(Trans, set_context_vars(TplVars, Context)).
+lookup_translation({trans, _} = Trans, #{} = _TplVars, Context) ->
+    z_trans:lookup_fallback(Trans, Context).
 
 
 %% @doc Render a custom tag (Zotonic scomp)
@@ -319,11 +350,10 @@ custom_tag(Tag, Args, Vars, Context) ->
 -spec builtin_tag(template_compiler:builtin_tag(), Expr::term(), Args::list(), Vars::#{}, Context::term()) -> 
             template_compiler:render_result().
 builtin_tag(Tag, Expr, Args, Vars, Context) ->
-    Context1 = set_context_vars(Vars, Context),
-    builtin_tag_1(Tag, Expr, to_simple_values(Args, Context1), Vars, Context1).
+    builtin_tag_1(Tag, Expr, to_simple_values(Args, Context), Vars, Context).
 
-builtin_tag_1(url, Dispatch, Args, Vars, Context) ->
-    z_dispatcher:url_for(z_convert:to_atom(Dispatch), Args, set_context_vars(Vars, Context));
+builtin_tag_1(url, Dispatch, Args, _Vars, Context) ->
+    z_dispatcher:url_for(z_convert:to_atom(Dispatch), Args, Context);
 builtin_tag_1(lib, Libs, Args, _Vars, Context) ->
     z_lib_include:tag(Libs, Args, Context);
 builtin_tag_1(image, Expr, Args, _Vars, Context) ->
@@ -465,18 +495,6 @@ to_render_result(V, TplVars, Context) ->
 -spec escape(Value :: iolist(), Context :: term()) -> iolist().
 escape(Value, _Context) ->
     z_html:escape(iolist_to_binary(Value)).
-
-
-
-set_context_vars(TplVars, Context) ->
-    Lang = z_context:language(Context),
-    Context1 = case maps:get(z_language, TplVars, Lang) of
-            undefined -> Context;
-            Lang -> Context;
-            NewLang -> z_context:set_language(NewLang, Context)
-    end,
-    %% Todo: check for 'with sudo'
-    Context1.
 
 %% @doc Called when compiling a module
 -spec trace_compile(atom(), binary(), template_compiler:options(), term()) -> ok.

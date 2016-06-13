@@ -76,7 +76,18 @@ render(#module_index{filepath=Filename, key=Key}, Vars, Context) ->
 render(Template, Vars, Context) when is_map(Vars) ->
     OldCaching = z_depcache:in_process(true),
     Vars1 = ensure_zotonic_vars(Vars, Context),
-    Result = template_compiler:render(Template, Vars1, [{runtime, z_template_compiler_runtime}], Context),
+    Result = template_compiler:render(
+                    Template,
+                    Vars1,
+                    [
+                        {runtime, z_template_compiler_runtime},
+                        {context_vars, [
+                            <<"sudo">>,
+                            <<"anondo">>,
+                            <<"z_language">>
+                        ]}
+                    ],
+                    Context),
     z_depcache:in_process(OldCaching),
     case Result of
         {ok, Output} ->
