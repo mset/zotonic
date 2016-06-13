@@ -1,9 +1,9 @@
 %% @author Marc Worrell <marc@worrell.nl>
-%% @copyright 2009-2014 Marc Worrell
+%% @copyright 2009-2016 Marc Worrell
 %%
 %% @doc Utility functions for datetime handling and representation.
 
-%% Copyright 2009-2014 Marc Worrell
+%% Copyright 2009-2016 Marc Worrell
 %%
 %% Licensed under the Apache License, Version 2.0 (the "License");
 %% you may not use this file except in compliance with the License.
@@ -33,8 +33,6 @@
 
     to_datetime/1,
     to_datetime/2,
-
-    format/3,
 
     timesince/2,
     timesince/3,
